@@ -531,9 +531,7 @@ def commit_node(state: AgentState):
 def create_github_repo_node(state: AgentState):
 
     repo_name = state.get("repo_name")
-    repo_description = state.get(
-        "repo_description"
-    )
+    repo_description = state.get("repo_description")
     private = state.get("private")
 
     if not repo_name:
@@ -551,27 +549,86 @@ def create_github_repo_node(state: AgentState):
             "error": "Repository visibility is missing."
         }
 
+    print("\n===== GITHUB REPOSITORY =====")
+    print(f"Repository: {repo_name}")
+
+    # ------------------------------------------------
+    # Try to create repository
+    # ------------------------------------------------
+
     result = create_repository(
         name=repo_name,
         description=repo_description,
         private=private,
     )
 
-    if not result.get("success"):
+    # ------------------------------------------------
+    # Repository created
+    # ------------------------------------------------
+
+    if result.get("success"):
+
+        print("Repository created successfully.")
 
         return {
-            "error": result.get(
-                "message",
-                "GitHub repository creation failed."
-            )
+            "github_repo_created": True,
+            "github_url": result["url"],
+            "github_clone_url": result["clone_url"],
         }
 
-    return {
-        "github_repo_created": True,
-        "github_url": result["url"],
-        "github_clone_url": result["clone_url"],
-    }
+    # ------------------------------------------------
+    # Repository already exists
+    # ------------------------------------------------
 
+    message = result.get(
+        "message",
+        ""
+    )
+
+    if "already exists" in message.lower():
+
+        print(
+            "Repository already exists."
+        )
+
+        print(
+            "Attempting to use the existing repository..."
+        )
+
+        existing = get_repository(
+            repo_name
+        )
+
+        if not existing.get("success"):
+
+            return {
+                "error": (
+                    "Repository exists, but "
+                    "could not retrieve it: "
+                    + existing.get(
+                        "message",
+                        "Unknown error",
+                    )
+                )
+            }
+
+        print(
+            "Existing repository found."
+        )
+
+        return {
+            "github_repo_created": True,
+            "github_url": existing["url"],
+            "github_clone_url": existing["clone_url"],
+        }
+
+    # ------------------------------------------------
+    # Other GitHub error
+    # ------------------------------------------------
+
+    return {
+        "error": message or "GitHub repository creation failed."
+    }
 
 def remote_node(state: AgentState):
 
