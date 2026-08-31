@@ -659,7 +659,7 @@ def remote_node(state: AgentState):
     print("\n===== GIT REMOTE =====")
 
     # Get existing remotes
-    result = git_remote_get(project_path)
+    result = git_remote_get.invoke(project_path)
 
     if not result.get("success"):
         return {
@@ -721,7 +721,7 @@ def remote_node(state: AgentState):
     print("Origin points to a different repository.")
     print("Updating origin...")
 
-    result = git_set_remote(
+    result = git_set_remote.invoke(
         project_path,
         expected_url,
     )
