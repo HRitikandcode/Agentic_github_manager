@@ -262,3 +262,107 @@ def push_to_github(project_path: str) -> dict:
     Push the current Git branch to the GitHub origin remote.
     """
     return git_push(project_path)
+
+
+import subprocess
+
+from langchain_core.tools import tool
+
+
+@tool
+def git_remote_get(project_path: str) -> dict:
+    """
+    Get the Git remote URLs for a project.
+    """
+
+    try:
+
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                project_path,
+                "remote",
+                "-v",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        if result.returncode != 0:
+
+            return {
+                "success": False,
+                "message": result.stderr.strip(),
+            }
+
+        origin = None
+
+        for line in result.stdout.splitlines():
+
+            parts = line.split()
+
+            if len(parts) >= 2 and parts[0] == "origin":
+
+                origin = parts[1]
+                break
+
+        return {
+            "success": True,
+            "origin": origin,
+        }
+
+    except Exception as e:
+
+        return {
+            "success": False,
+            "message": str(e),
+        }
+
+
+
+@tool
+def git_set_remote(
+    project_path: str,
+    remote_url: str,
+) -> dict:
+    """
+    Set the origin remote URL for a Git repository.
+    """
+
+    try:
+
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                project_path,
+                "remote",
+                "set-url",
+                "origin",
+                remote_url,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        if result.returncode != 0:
+
+            return {
+                "success": False,
+                "message": result.stderr.strip(),
+            }
+
+        return {
+            "success": True,
+            "remote_url": remote_url,
+        }
+
+    except Exception as e:
+
+        return {
+            "success": False,
+            "message": str(e),
+        }

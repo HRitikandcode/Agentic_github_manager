@@ -15,8 +15,11 @@ from tools.git_tool import (
     git_commit,
     git_add_remote,
     git_push,
+    git_remote_get,
+    git_set_remote,
     
 )
+
 from tools.github_tools import (
     create_github_repository,
     get_github_repository,
@@ -650,16 +653,89 @@ def create_github_repo_node(state: AgentState):
 
 def remote_node(state: AgentState):
 
-    result = git_add_remote(
-        state["project_path"],
-        state["github_clone_url"],
+    project_path = state["project_path"]
+    expected_url = state["github_clone_url"]
+
+    print("\n===== GIT REMOTE =====")
+
+    # Get existing remotes
+    result = git_remote_get(project_path)
+
+    if not result.get("success"):
+        return {
+            "error": result.get(
+                "message",
+                "Unable to inspect Git remotes."
+            )
+        }
+
+    existing_origin = result.get("origin")
+
+    # ------------------------------------------------
+    # No origin exists
+    # ------------------------------------------------
+
+    if not existing_origin:
+
+        print("No origin remote found.")
+        print("Adding GitHub repository as origin...")
+
+        result = git_add_remote(
+            project_path,
+            expected_url,
+        )
+
+        if not result.get("success"):
+            return {
+                "error": result.get(
+                    "message",
+                    "Failed to add GitHub remote."
+                )
+            }
+
+        print("Origin added successfully.")
+
+        return {}
+
+    # ------------------------------------------------
+    # Origin already exists
+    # ------------------------------------------------
+
+    print(f"Existing origin: {existing_origin}")
+
+    # Normalize URLs before comparison
+    current = existing_origin.rstrip("/").rstrip(".git")
+    expected = expected_url.rstrip("/").rstrip(".git")
+
+    if current.lower() == expected.lower():
+
+        print("Origin already points to the correct repository.")
+        print("Keeping existing origin.")
+
+        return {}
+
+    # ------------------------------------------------
+    # Origin points somewhere else
+    # ------------------------------------------------
+
+    print("Origin points to a different repository.")
+    print("Updating origin...")
+
+    result = git_set_remote(
+        project_path,
+        expected_url,
     )
 
     if not result.get("success"):
 
         return {
-            "error": result.get("message")
+            "error": result.get(
+                "message",
+                "Failed to update Git remote."
+            )
         }
+
+    print("Origin updated successfully.")
 
     return {}
 
