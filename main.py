@@ -1,11 +1,12 @@
 import os
-
+import argparse
 from agents.graphs import build_graph
 
 
 def main():
 
-    project_path = os.getcwd()
+    project_path = get_project_path()
+    validate_project(project_path)
 
     print("=" * 60)
     print("AGENTIC GITHUB REPOSITORY MANAGER")
@@ -67,6 +68,42 @@ any GitHub or Git write operations.
 
         print(
             "\nOperation ended without publishing."
+        )
+
+
+def get_project_path():
+
+    parser = argparse.ArgumentParser(
+        description="Agentic GitHub Repository Manager"
+    )
+
+    parser.add_argument(
+        "--project",
+        type=str,
+        default=None,
+        help="Path to the project to publish",
+    )
+
+    args = parser.parse_args()
+
+    if args.project:
+        return os.path.abspath(
+            args.project
+        )
+
+    return os.getcwd()
+
+
+def validate_project(path):
+
+    if not os.path.exists(path):
+        raise ValueError(
+            f"Project does not exist: {path}"
+        )
+
+    if not os.path.isdir(path):
+        raise ValueError(
+            f"Project path is not a directory: {path}"
         )
 
 

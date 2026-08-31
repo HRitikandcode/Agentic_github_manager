@@ -107,14 +107,32 @@ def set_repository_metadata(
     commit_message: str,
 ) -> dict:
     """
-    Store proposed GitHub repository metadata.
+    Generate and validate proposed GitHub repository metadata.
     This tool does not create or modify a GitHub repository.
     """
 
+    if not repo_name:
+        return {
+            "success": False,
+            "message": "Repository name cannot be empty.",
+        }
+
+    if not repo_description:
+        return {
+            "success": False,
+            "message": "Repository description cannot be empty.",
+        }
+
+    if not commit_message:
+        return {
+            "success": False,
+            "message": "Commit message cannot be empty.",
+        }
+
     return {
         "success": True,
-        "repo_name": repo_name,
-        "repo_description": repo_description,
-        "private": private,
-        "commit_message": commit_message,
+        "repo_name": repo_name.strip(),
+        "repo_description": repo_description.strip(),
+        "private": bool(private),
+        "commit_message": commit_message.strip(),
     }

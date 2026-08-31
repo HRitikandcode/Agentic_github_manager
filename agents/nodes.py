@@ -223,7 +223,7 @@ def metadata_node(state: AgentState):
         return {
             "error": analysis.get(
                 "message",
-                "Workspace inspection failed."
+                "Workspace inspection failed.",
             )
         }
 
@@ -232,8 +232,7 @@ def metadata_node(state: AgentState):
     extensions = analysis.get("file_extensions", {})
 
     prompt = f"""
-Analyze this software project and prepare metadata
-for a GitHub repository.
+Analyze this software project.
 
 Project path:
 {project_path}
@@ -247,20 +246,26 @@ Directories:
 File extensions:
 {extensions}
 
-Use the set_repository_metadata tool to provide:
+Your task is to generate GitHub repository metadata.
+
+You MUST call the set_repository_metadata tool.
+
+Generate:
 
 1. A concise repository name.
 2. A one-sentence repository description.
 3. Whether the repository should be private.
-4. An appropriate initial commit message.
+4. An appropriate initial Git commit message.
 
 Rules:
 
-- Repository name must be lowercase kebab-case.
+- Repository name must use lowercase kebab-case.
+- Keep the name concise.
+- Description must describe the actual project.
 - Do not invent technologies.
 - Prefer private=true.
-- Do not create or modify the GitHub repository.
-- Only generate metadata.
+- Commit message should be concise.
+- Do NOT create or modify the GitHub repository.
 """
 
     response = llm_with_tools.invoke(
@@ -276,80 +281,68 @@ Rules:
         ]
     )
 
-    print("\n===== METADATA AGENT RESPONSE =====")
-    print(response)
+    print("\n===== METADATA TOOL CALL =====")
 
-    return {
-        "workspace_analysis": analysis,
-        "messages": [response],
-    }
+    print(response.tool_calls)
 
+    if not response.tool_calls:
 
-def metadata_node(state: AgentState):
-
-    project_path = state["project_path"]
-
-    analysis = inspect_workspace.invoke({
-        "project_path": project_path
-    })
-
-    if not analysis.get("success"):
         return {
-            "error": analysis.get(
-                "message",
-                "Workspace inspection failed.",
+            "error": (
+                "LLM failed to generate repository metadata."
             )
         }
 
-    files = analysis.get("files", [])
-    extensions = analysis.get(
-        "file_extensions",
-        {},
+    tool_call = response.tool_calls[0]
+
+    if tool_call["name"] != "set_repository_metadata":
+
+        return {
+            "error": (
+                f"Unexpected tool call: "
+                f"{tool_call['name']}"
+            )
+        }
+
+    metadata = tool_call["args"]
+
+    print("\n===== GENERATED METADATA =====")
+
+    print(
+        f"Repository: "
+        f"{metadata['repo_name']}"
     )
 
-    print("\n===== WORKSPACE ANALYSIS =====")
-
-    print(f"Files: {len(files)}")
-    print(f"Extensions: {extensions}")
-
-    # ------------------------------------------------
-    # Temporary metadata
-    # ------------------------------------------------
-    #
-    # We'll make this LLM-generated later.
-    #
-
-    repo_name = "agentic-github-manager"
-
-    repo_description = (
-        "An agentic AI system for managing Git "
-        "and GitHub repositories using LangChain "
-        "and LangGraph."
+    print(
+        f"Description: "
+        f"{metadata['repo_description']}"
     )
 
-    commit_message = "Initial commit"
+    print(
+        f"Private: "
+        f"{metadata['private']}"
+    )
 
-    private = True
-
-    print("\n===== REPOSITORY METADATA =====")
-
-    print(f"Name: {repo_name}")
-    print(f"Description: {repo_description}")
-    print(f"Private: {private}")
-    print(f"Commit: {commit_message}")
+    print(
+        f"Commit: "
+        f"{metadata['commit_message']}"
+    )
 
     return {
         "workspace_analysis": analysis,
 
-        "repo_name": repo_name,
+        "repo_name": metadata["repo_name"],
 
-        "repo_description": repo_description,
+        "repo_description": (
+            metadata["repo_description"]
+        ),
 
-        "private": private,
+        "private": metadata["private"],
 
-        "commit_message": commit_message,
+        "commit_message": (
+            metadata["commit_message"]
+        ),
     }
-
 
 
 
