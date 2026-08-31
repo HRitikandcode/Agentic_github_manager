@@ -297,66 +297,58 @@ def metadata_node(state: AgentState):
         return {
             "error": analysis.get(
                 "message",
-                "Workspace inspection failed."
+                "Workspace inspection failed.",
             )
         }
 
     files = analysis.get("files", [])
-    directories = analysis.get("directories", [])
-    extensions = analysis.get("file_extensions", {})
-
-    metadata_prompt = f"""
-You are preparing a software project for GitHub.
-
-Analyze the following project information.
-
-Project path:
-{project_path}
-
-Files:
-{files}
-
-Directories:
-{directories}
-
-File extensions:
-{extensions}
-
-Generate GitHub repository metadata.
-
-Return ONLY valid JSON.
-
-Required format:
-
-{{
-    "repo_name": "example-project",
-    "repo_description": "Short description of the project",
-    "private": true,
-    "commit_message": "Initial commit"
-}}
-
-Rules:
-
-- repo_name must use lowercase kebab-case.
-- repo_name should be concise.
-- repo_description must describe the actual project.
-- Do not invent technologies that are not supported by the project.
-- private should normally be true.
-- commit_message should be concise.
-"""
-
-    response = chat_model.invoke(
-        metadata_prompt
+    extensions = analysis.get(
+        "file_extensions",
+        {},
     )
 
-    print("\n===== RAW METADATA RESPONSE =====")
-    print(response.content)
+    print("\n===== WORKSPACE ANALYSIS =====")
+
+    print(f"Files: {len(files)}")
+    print(f"Extensions: {extensions}")
+
+    # ------------------------------------------------
+    # Temporary metadata
+    # ------------------------------------------------
+    #
+    # We'll make this LLM-generated later.
+    #
+
+    repo_name = "agentic-github-manager"
+
+    repo_description = (
+        "An agentic AI system for managing Git "
+        "and GitHub repositories using LangChain "
+        "and LangGraph."
+    )
+
+    commit_message = "Initial commit"
+
+    private = True
+
+    print("\n===== REPOSITORY METADATA =====")
+
+    print(f"Name: {repo_name}")
+    print(f"Description: {repo_description}")
+    print(f"Private: {private}")
+    print(f"Commit: {commit_message}")
 
     return {
         "workspace_analysis": analysis,
-        "messages": [response],
-    }
 
+        "repo_name": repo_name,
+
+        "repo_description": repo_description,
+
+        "private": private,
+
+        "commit_message": commit_message,
+    }
 
 
 
