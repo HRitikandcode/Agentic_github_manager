@@ -721,10 +721,10 @@ def remote_node(state: AgentState):
     print("Origin points to a different repository.")
     print("Updating origin...")
 
-    result = git_set_remote.invoke(
-        project_path,
-        expected_url,
-    )
+    result = git_set_remote.invoke({
+        "project_path": project_path,
+        "remote_url": expected_url,
+    })
 
     if not result.get("success"):
 
