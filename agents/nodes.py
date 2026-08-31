@@ -124,40 +124,79 @@ IMPORTANT RULES:
 
 def planning_node(state: AgentState):
 
+    project_path = state["project_path"]
+
     repo_name = state.get(
         "repo_name",
-        "unknown"
+        "unknown",
     )
 
     description = state.get(
         "repo_description",
-        ""
+        "",
     )
 
     private = state.get(
         "private",
-        True
+        True,
     )
 
     commit_message = state.get(
         "commit_message",
-        "Initial commit"
+        "Initial commit",
     )
 
-    visibility = "Private" if private else "Public"
+    # -----------------------------------------
+    # Check current Git state
+    # -----------------------------------------
+
+    status = git_status(project_path)
+
+    if not status.get("success"):
+
+        return {
+            "error": status.get(
+                "message",
+                "Unable to determine Git status."
+            )
+        }
+
+    has_changes = status.get(
+        "has_changes",
+        False,
+    )
+
+    # -----------------------------------------
+    # Build plan
+    # -----------------------------------------
 
     plan = [
         "Inspect the current project",
         "Check Git repository status",
         f"Create GitHub repository: {repo_name}",
         f"Set repository description: {description}",
-        f"Repository visibility: {visibility}",
-        "Stage project files",
-        f'Create commit: "{commit_message}"',
+        f"Repository visibility: "
+        f"{'Private' if private else 'Public'}",
+    ]
+
+    if has_changes:
+
+        plan.extend([
+            "Stage project files",
+            f'Create commit: "{commit_message}"',
+        ])
+
+    else:
+
+        plan.append(
+            "No local changes detected; skip commit"
+        )
+
+    plan.extend([
         "Configure the GitHub repository as origin",
         "Push the current branch to GitHub",
         "Verify the GitHub repository",
-    ]
+    ])
 
     print("\n===== PROPOSED PLAN =====")
 
@@ -169,7 +208,6 @@ def planning_node(state: AgentState):
 
     return {
         "plan": plan,
-        "approval_required": True,
     }
 
 
@@ -432,23 +470,61 @@ def stage_files_node(state: AgentState):
 
 def commit_node(state: AgentState):
 
+    project_path = state["project_path"]
+
+    # Check Git status first
+    status = git_status(project_path)
+
+    if not status.get("success"):
+        return {
+            "error": status.get(
+                "message",
+                "Unable to check Git status."
+            )
+        }
+
+    # ------------------------------------------------
+    # Nothing changed
+    # ------------------------------------------------
+
+    if not status.get("has_changes", False):
+
+        print("\n===== GIT COMMIT =====")
+        print("No changes detected.")
+        print("Skipping commit.")
+
+        return {
+            "commit_created": False,
+        }
+
+    # ------------------------------------------------
+    # Changes exist
+    # ------------------------------------------------
+
     commit_message = state.get(
         "commit_message",
-        "Initial commit",
+        "Update project",
     )
 
     result = git_commit(
-        state["project_path"],
+        project_path,
         commit_message,
     )
 
     if not result.get("success"):
+
         return {
-            "error": result.get("message")
+            "error": result.get(
+                "message",
+                "Git commit failed."
+            )
         }
 
+    print("\n===== GIT COMMIT =====")
+    print(f"Commit created: {commit_message}")
+
     return {
-        "commit_created": True
+        "commit_created": True,
     }
 
 
