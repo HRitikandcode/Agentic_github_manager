@@ -616,10 +616,28 @@ def create_github_repo_node(state: AgentState):
             "Existing repository found."
         )
 
+        # Get repository URL from the existing repository response
+        github_url = existing.get("url")
+
+        # GitHub clone URL may not be returned by our tool.
+        # Construct it from the repository URL.
+        if not github_url:
+            return {
+                "error": (
+                    "Existing repository was found, "
+                    "but its URL was not returned."
+                )
+            }
+
+        github_clone_url = github_url.rstrip("/") + ".git"
+
+        print(f"GitHub URL: {github_url}")
+        print(f"Git clone URL: {github_clone_url}")
+
         return {
             "github_repo_created": True,
-            "github_url": existing["url"],
-            "github_clone_url": existing["clone_url"],
+            "github_url": github_url,
+            "github_clone_url": github_clone_url,
         }
 
     # ------------------------------------------------
