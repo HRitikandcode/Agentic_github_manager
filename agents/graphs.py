@@ -1,8 +1,4 @@
-from langgraph.graph import (
-    StateGraph,
-    START,
-    END,
-)
+from langgraph.graph import StateGraph, START, END
 
 from agents.state import AgentState
 
@@ -10,17 +6,44 @@ from agents.nodes import (
     metadata_node,
     planning_node,
     human_approval_node,
-
     initialize_git_node,
     stage_files_node,
     commit_node,
-
     create_github_repo_node,
     remote_node,
     push_node,
     verify_node,
+    error_node,
 )
 
+
+# ============================================================
+# ROUTER: METADATA
+# ============================================================
+
+def metadata_router(state: AgentState):
+
+    if state.get("error"):
+        return "error"
+
+    required = [
+        "repo_name",
+        "repo_description",
+        "private",
+        "commit_message",
+    ]
+
+    for field in required:
+
+        if field not in state:
+            return "error"
+
+    return "planning"
+
+
+# ============================================================
+# ROUTER: APPROVAL
+# ============================================================
 
 def approval_router(state: AgentState):
 
@@ -30,13 +53,29 @@ def approval_router(state: AgentState):
     return "end"
 
 
+# ============================================================
+# ROUTER: EXECUTION ERROR
+# ============================================================
+
+def execution_router(state: AgentState):
+
+    if state.get("error"):
+        return "error"
+
+    return "continue"
+
+
+# ============================================================
+# BUILD GRAPH
+# ============================================================
+
 def build_graph():
 
     graph = StateGraph(AgentState)
 
-    # -------------------------
+    # --------------------------------------------------------
     # Nodes
-    # -------------------------
+    # --------------------------------------------------------
 
     graph.add_node(
         "metadata",
@@ -88,24 +127,45 @@ def build_graph():
         verify_node,
     )
 
-    # -------------------------
-    # Workflow
-    # -------------------------
+    graph.add_node(
+        "error",
+        error_node,
+    )
+
+    # --------------------------------------------------------
+    # START
+    # --------------------------------------------------------
 
     graph.add_edge(
         START,
         "metadata",
     )
 
-    graph.add_edge(
+    # --------------------------------------------------------
+    # Metadata
+    # --------------------------------------------------------
+
+    graph.add_conditional_edges(
         "metadata",
-        "planning",
+        metadata_router,
+        {
+            "planning": "planning",
+            "error": "error",
+        },
     )
+
+    # --------------------------------------------------------
+    # Planning → Approval
+    # --------------------------------------------------------
 
     graph.add_edge(
         "planning",
         "approval",
     )
+
+    # --------------------------------------------------------
+    # Approval
+    # --------------------------------------------------------
 
     graph.add_conditional_edges(
         "approval",
@@ -116,38 +176,103 @@ def build_graph():
         },
     )
 
-    graph.add_edge(
+    # --------------------------------------------------------
+    # Git initialization
+    # --------------------------------------------------------
+
+    graph.add_conditional_edges(
         "initialize_git",
+        execution_router,
+        {
+            "continue": "stage_files",
+            "error": "error",
+        },
+    )
+
+    # --------------------------------------------------------
+    # Stage files
+    # --------------------------------------------------------
+
+    graph.add_conditional_edges(
         "stage_files",
+        execution_router,
+        {
+            "continue": "commit",
+            "error": "error",
+        },
     )
 
-    graph.add_edge(
-        "stage_files",
+    # --------------------------------------------------------
+    # Commit
+    # --------------------------------------------------------
+
+    graph.add_conditional_edges(
         "commit",
+        execution_router,
+        {
+            "continue": "create_github_repo",
+            "error": "error",
+        },
     )
 
-    graph.add_edge(
-        "commit",
+    # --------------------------------------------------------
+    # GitHub repository
+    # --------------------------------------------------------
+
+    graph.add_conditional_edges(
         "create_github_repo",
+        execution_router,
+        {
+            "continue": "remote",
+            "error": "error",
+        },
     )
 
-    graph.add_edge(
-        "create_github_repo",
+    # --------------------------------------------------------
+    # Remote
+    # --------------------------------------------------------
+
+    graph.add_conditional_edges(
         "remote",
+        execution_router,
+        {
+            "continue": "push",
+            "error": "error",
+        },
     )
 
-    graph.add_edge(
-        "remote",
+    # --------------------------------------------------------
+    # Push
+    # --------------------------------------------------------
+
+    graph.add_conditional_edges(
         "push",
+        execution_router,
+        {
+            "continue": "verify",
+            "error": "error",
+        },
     )
 
-    graph.add_edge(
-        "push",
+    # --------------------------------------------------------
+    # Verify
+    # --------------------------------------------------------
+
+    graph.add_conditional_edges(
         "verify",
+        execution_router,
+        {
+            "continue": END,
+            "error": "error",
+        },
     )
 
+    # --------------------------------------------------------
+    # Error
+    # --------------------------------------------------------
+
     graph.add_edge(
-        "verify",
+        "error",
         END,
     )
 

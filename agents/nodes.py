@@ -210,11 +210,18 @@ def approval_router(state: AgentState):
 
     return "end"
 
+metadata_llm = chat_model.bind_tools(
+    [set_repository_metadata]
+)
+
 
 def metadata_node(state: AgentState):
 
     project_path = state["project_path"]
 
+    print("\n===== ANALYZING WORKSPACE =====")
+
+    # Inspect workspace directly.
     analysis = inspect_workspace.invoke({
         "project_path": project_path
     })
@@ -223,7 +230,7 @@ def metadata_node(state: AgentState):
         return {
             "error": analysis.get(
                 "message",
-                "Workspace inspection failed.",
+                "Workspace inspection failed."
             )
         }
 
@@ -232,7 +239,9 @@ def metadata_node(state: AgentState):
     extensions = analysis.get("file_extensions", {})
 
     prompt = f"""
-Analyze this software project.
+You are generating metadata for a GitHub repository.
+
+The workspace has ALREADY been inspected.
 
 Project path:
 {project_path}
@@ -246,105 +255,135 @@ Directories:
 File extensions:
 {extensions}
 
-Your task is to generate GitHub repository metadata.
+DO NOT inspect the workspace.
+DO NOT call inspect_workspace.
+DO NOT call any other tool.
 
-You MUST call the set_repository_metadata tool.
+You MUST call set_repository_metadata.
 
 Generate:
 
-1. A concise repository name.
-2. A one-sentence repository description.
-3. Whether the repository should be private.
-4. An appropriate initial Git commit message.
+- repo_name
+- repo_description
+- private
+- commit_message
 
 Rules:
-
-- Repository name must use lowercase kebab-case.
-- Keep the name concise.
+- repo_name must be lowercase kebab-case.
+- Keep the repository name concise.
 - Description must describe the actual project.
 - Do not invent technologies.
-- Prefer private=true.
+- Set private to true.
 - Commit message should be concise.
-- Do NOT create or modify the GitHub repository.
 """
 
-    response = llm_with_tools.invoke(
-        [
-            (
-                "system",
-                "You are a software project analysis assistant."
-            ),
-            (
-                "user",
-                prompt
-            ),
-        ]
-    )
+    response = metadata_llm.invoke([
+        (
+            "system",
+            """
+You are a GitHub repository metadata generator.
 
-    print("\n===== METADATA TOOL CALL =====")
+You have exactly ONE tool available:
+set_repository_metadata.
 
+You MUST use that tool.
+Do not call any other tool.
+"""
+        ),
+        (
+            "user",
+            prompt
+        ),
+    ])
+
+    print("\n===== METADATA LLM RESPONSE =====")
+    print(response)
+
+    print("\n===== METADATA TOOL CALLS =====")
     print(response.tool_calls)
 
+    # Validate tool call
     if not response.tool_calls:
-
         return {
             "error": (
-                "LLM failed to generate repository metadata."
+                "GLM-5.2 failed to generate repository metadata."
             )
         }
 
     tool_call = response.tool_calls[0]
 
     if tool_call["name"] != "set_repository_metadata":
-
         return {
             "error": (
-                f"Unexpected tool call: "
+                f"Unexpected tool called: "
                 f"{tool_call['name']}"
             )
         }
 
     metadata = tool_call["args"]
 
-    print("\n===== GENERATED METADATA =====")
+    # Validate fields
+    required_fields = [
+        "repo_name",
+        "repo_description",
+        "private",
+        "commit_message",
+    ]
 
-    print(
-        f"Repository: "
-        f"{metadata['repo_name']}"
-    )
+    missing = [
+        field
+        for field in required_fields
+        if field not in metadata
+    ]
 
-    print(
-        f"Description: "
-        f"{metadata['repo_description']}"
-    )
+    if missing:
+        return {
+            "error": (
+                f"Missing metadata fields: {missing}"
+            )
+        }
 
-    print(
-        f"Private: "
-        f"{metadata['private']}"
-    )
+    # Store metadata in LangGraph state
+    repo_name = metadata["repo_name"].strip()
+    repo_description = metadata[
+        "repo_description"
+    ].strip()
 
-    print(
-        f"Commit: "
-        f"{metadata['commit_message']}"
-    )
+    commit_message = metadata[
+        "commit_message"
+    ].strip()
+
+    private = bool(metadata["private"])
+
+    print("\n===== GENERATED REPOSITORY METADATA =====")
+    print(f"Repository: {repo_name}")
+    print(f"Description: {repo_description}")
+    print(f"Private: {private}")
+    print(f"Commit: {commit_message}")
 
     return {
         "workspace_analysis": analysis,
-
-        "repo_name": metadata["repo_name"],
-
-        "repo_description": (
-            metadata["repo_description"]
-        ),
-
-        "private": metadata["private"],
-
-        "commit_message": (
-            metadata["commit_message"]
-        ),
+        "repo_name": repo_name,
+        "repo_description": repo_description,
+        "private": private,
+        "commit_message": commit_message,
     }
+    
 
+def error_node(state: AgentState):
 
+    print("\n" + "=" * 60)
+    print("AGENT ERROR")
+    print("=" * 60)
+
+    print(
+        state.get(
+            "error",
+            "Unknown error occurred."
+        )
+    )
+
+    return {}
 
 def initialize_git_node(state: AgentState):
 
@@ -415,16 +454,40 @@ def commit_node(state: AgentState):
 
 def create_github_repo_node(state: AgentState):
 
+    repo_name = state.get("repo_name")
+    repo_description = state.get(
+        "repo_description"
+    )
+    private = state.get("private")
+
+    if not repo_name:
+        return {
+            "error": "Repository name is missing."
+        }
+
+    if not repo_description:
+        return {
+            "error": "Repository description is missing."
+        }
+
+    if private is None:
+        return {
+            "error": "Repository visibility is missing."
+        }
+
     result = create_repository(
-        name=state["repo_name"],
-        description=state["repo_description"],
-        private=state["private"],
+        name=repo_name,
+        description=repo_description,
+        private=private,
     )
 
     if not result.get("success"):
 
         return {
-            "error": result.get("message")
+            "error": result.get(
+                "message",
+                "GitHub repository creation failed."
+            )
         }
 
     return {
