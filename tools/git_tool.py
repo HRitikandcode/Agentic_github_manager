@@ -1,7 +1,8 @@
 import os
-
+from langchain_core.tools import tool
 from git import Repo, GitCommandError
 from git.exc import InvalidGitRepositoryError, NoSuchPathError
+import subprocess
 
 
 def git_status(project_path: str) -> dict:
@@ -202,13 +203,6 @@ def git_push(project_path: str) -> dict:
         }
 
 
-
-
-
-
-
-from langchain_core.tools import tool
-
 @tool
 def check_git_status(project_path: str) -> dict:
     """
@@ -264,11 +258,6 @@ def push_to_github(project_path: str) -> dict:
     return git_push(project_path)
 
 
-import subprocess
-
-from langchain_core.tools import tool
-
-
 @tool
 def git_remote_get(project_path: str) -> dict:
     """
@@ -319,7 +308,6 @@ def git_remote_get(project_path: str) -> dict:
             "success": False,
             "message": str(e),
         }
-
 
 
 @tool

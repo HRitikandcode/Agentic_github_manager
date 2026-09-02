@@ -1,6 +1,6 @@
 from github import Github
 from github.GithubException import GithubException
-
+from langchain_core.tools import tool
 from config import GITHUB_TOKEN
 
 
@@ -143,9 +143,6 @@ def update_repository(
         }
 
 
-
-from langchain_core.tools import tool
-
 @tool
 def create_github_repository(
     name: str,
@@ -168,7 +165,6 @@ def get_github_repository(name: str) -> dict:
     Get information about an existing GitHub repository.
     """
     return get_repository(name)
-
 
 
 @tool
