@@ -4,9 +4,11 @@ from agents.state import AgentState
 
 from agents.nodes import (
     metadata_node,
+    metadata_approval_node,
     planning_node,
     human_approval_node,
     initialize_git_node,
+
     stage_files_node,
     commit_node,
     create_github_repo_node,
@@ -38,7 +40,15 @@ def metadata_router(state: AgentState):
         if field not in state:
             return "error"
 
-    return "planning"
+    return "metadata_approval"
+
+
+def metadata_approval_router(state: AgentState):
+
+    if state.get("metadata_approved") is True:
+        return "planning"
+
+    return "error"
 
 
 # ============================================================
@@ -80,6 +90,11 @@ def build_graph():
     graph.add_node(
         "metadata",
         metadata_node,
+    )
+
+    graph.add_node(
+        "metadata_approval",
+        metadata_approval_node,
     )
 
     graph.add_node(
@@ -148,6 +163,15 @@ def build_graph():
     graph.add_conditional_edges(
         "metadata",
         metadata_router,
+        {
+            "metadata_approval": "metadata_approval",
+            "error": "error",
+        },
+    )
+
+    graph.add_conditional_edges(
+        "metadata_approval",
+        metadata_approval_router,
         {
             "planning": "planning",
             "error": "error",

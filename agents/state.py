@@ -55,6 +55,7 @@ class AgentState(TypedDict, total=False):
     # Execution
     # -------------------------
 
+    metadata_approved: bool
     plan: list[str]
 
     approval_required: bool

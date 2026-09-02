@@ -411,6 +411,36 @@ Do not call any other tool.
     }
     
 
+def metadata_approval_node(state: AgentState):
+    repo_name = state.get("repo_name", "unknown")
+    repo_description = state.get("repo_description", "no description")
+
+    print("\n" + "=" * 60)
+    print("METADATA APPROVAL")
+    print("=" * 60)
+    print(f"Suggested Repository Name: {repo_name}")
+    print(f"Suggested Description:   {repo_description}")
+    print("=" * 60)
+
+    answer = input("\nIs this metadata okay? [y/n]: ").strip().lower()
+
+    if answer in {"y", "yes"}:
+        print("Metadata approved.")
+        return {"metadata_approved": True}
+
+    print("\nUpdating metadata manually...")
+    new_name = input(f"Enter project name [{repo_name}]: ").strip() or repo_name
+    new_desc = input(f"Enter project description [{repo_description}]: ").strip() or repo_description
+
+    print(f"\nUpdated Metadata:\nName: {new_name}\nDescription: {new_desc}")
+
+    return {
+        "repo_name": new_name,
+        "repo_description": new_desc,
+        "metadata_approved": True,
+    }
+
+
 def error_node(state: AgentState):
 
     print("\n" + "=" * 60)
